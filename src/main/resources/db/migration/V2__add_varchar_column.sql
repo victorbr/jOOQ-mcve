@@ -1,0 +1,1 @@
+ALTER TABLE mcve.test ADD charvalue VARCHAR(64);

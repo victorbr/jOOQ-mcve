@@ -43,8 +43,12 @@ import static org.junit.Assert.assertEquals;
 import java.sql.Connection;
 import java.sql.DriverManager;
 
+import org.jooq.Converter;
 import org.jooq.DSLContext;
+import org.jooq.DataType;
+import org.jooq.Field;
 import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.jooq.mcve.tables.records.TestRecord;
 
 import org.junit.After;
@@ -73,12 +77,78 @@ public class MCVETest {
     public void mcveTest() {
         TestRecord result =
         ctx.insertInto(TEST)
-           .columns(TEST.VALUE)
-           .values(42)
+           .columns(TEST.VALUE, TEST.CHARVALUE)
+           .values(42, "123q456")
            .returning(TEST.ID)
            .fetchOne();
 
         result.refresh();
         assertEquals(42, (int) result.getValue());
+
+        DataType<Long> longDataType = SQLDataType.VARCHAR.asConvertedDataType(new StringToLongConverter());
+        DataType<Integer> integerDataType = longDataType.asConvertedDataType(new LongToIntConverter());
+
+        Field<Integer> charValueAsInteger = DSL.cast(TEST.CHARVALUE, integerDataType);
+        Integer fetched = ctx.select(charValueAsInteger)
+                .from(TEST)
+                .where(TEST.ID.eq(result.value1()))
+                .fetchOne(charValueAsInteger);
+        assertEquals(1230456, fetched.intValue());
+    }
+
+    private static class StringToLongConverter implements Converter<String, Long> {
+        @Override
+        public Long from(String s) {
+            if (s != null)
+                return Long.parseLong(s.replaceAll("[^0-9]", "0"));
+            else
+                return null;
+        }
+
+        @Override
+        public String to(Long aLong) {
+            if (aLong != null)
+                return aLong.toString();
+            else
+                return null;
+        }
+
+        @Override
+        public Class<String> fromType() {
+            return String.class;
+        }
+
+        @Override
+        public Class<Long> toType() {
+            return Long.class;
+        }
+    }
+
+    private static class LongToIntConverter implements Converter<Long, Integer> {
+        @Override
+        public Integer from(Long aLong) {
+            if (aLong != null)
+                return aLong.intValue();
+            else
+                return null;
+        }
+
+        @Override
+        public Long to(Integer integer) {
+            if (integer != null)
+                return integer.longValue();
+            else
+                return null;
+        }
+
+        @Override
+        public Class<Long> fromType() {
+            return Long.class;
+        }
+
+        @Override
+        public Class<Integer> toType() {
+            return Integer.class;
+        }
     }
 }
